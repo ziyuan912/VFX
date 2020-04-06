@@ -1,13 +1,13 @@
 # Number of Images
 10
 # Filename  1/shutter_speed
-img0.JPG 0.25
-img1.JPG 0.5
-img2.JPG 1
-img3.JPG 2
-img4.JPG 4
-img5.JPG 8
-img6.JPG 16
-img7.JPG 32
-img8.JPG 64
-img9.JPG 128
+./images/img0.JPG 0.25
+./images/img1.JPG 0.5
+./images/img2.JPG 1
+./images/img3.JPG 2
+./images/img4.JPG 4
+./images/img5.JPG 8
+./images/img6.JPG 16
+./images/img7.JPG 32
+./images/img8.JPG 64
+./images/img9.JPG 128

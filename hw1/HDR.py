@@ -32,10 +32,6 @@ def read_imgs(file):
 	return imgs, B, P
 
 def get_sample_point(imgs, intensity, median, channel):
-	"""for i in range(imgs[median].shape[0]):
-		for j in range(imgs[median].shape[1]):
-			if imgs[median][i][j][channel] == intensity:
-				intensity_points.append((i, j))"""
 	output_row, output_col = np.where(imgs[median][:, :, channel] == intensity)
 	if len(output_row) == 0:
 		return (random.randint(50, imgs[0].shape[0]-50), random.randint(50, imgs[0].shape[1]-50))
@@ -46,8 +42,8 @@ def Z_generator(imgs, img_shape, N):
 	Z = np.zeros((N, len(imgs), 3))
 	for i in range(N):
 		for k in range(3):
-			sample_point = get_sample_point(imgs, i, len(imgs) // 2, k)
-			#rand_point = (random.randint(50, img_shape[0]-50), random.randint(50, img_shape[1]-50))
+			#sample_point = get_sample_point(imgs, i, len(imgs) // 2, k)
+			sample_point = (random.randint(50, img_shape[0]-50), random.randint(50, img_shape[1]-50))
 			for j in range(len(imgs)):			
 				Z[i, j] = imgs[j][sample_point[0], sample_point[1]]
 	Z = Z.astype(int)
@@ -63,7 +59,7 @@ def W(z):
 	else:
 		return 0.0
 
-def HDR(A, B, Z, b):
+def HDR(A, B, Z, b, l):
 	k = 0
 	for i in range(Z.shape[0]):
 		for j in range(Z.shape[1]):
@@ -75,9 +71,9 @@ def HDR(A, B, Z, b):
 	A[k, 128] = 1
 	k += 1
 	for i in range(n - 2):
-		A[k, i] = W(i + 1)
-		A[k, i + 1] = -2*W(i + 1)
-		A[k, i + 2] = W(i + 1)
+		A[k, i] =  l * W(i + 1)
+		A[k, i + 1] = -2 * l * W(i + 1)
+		A[k, i + 2] = l * W(i + 1)
 		k += 1
 	x, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
 	return x
@@ -125,6 +121,7 @@ def bilateral(img, args):
 
 def build_HDR_image(imgs, g, t_delta):
 	HDR_output = np.zeros((imgs[0].shape[0], imgs[0].shape[1], 3), dtype='float32')
+	radiance_map = np.zeros((imgs[0].shape[0], imgs[0].shape[1], 3), dtype='float32')
 	for i in range(imgs[0].shape[0]):
 		for j in range(imgs[0].shape[1]):
 			for k in range(3):
@@ -133,10 +130,16 @@ def build_HDR_image(imgs, g, t_delta):
 				for p in range(len(imgs)):
 					eup += W(imgs[p][i, j, k] + 1)*(g[imgs[p][i, j, k], k] - t_delta[p])
 					edown += W(imgs[p][i, j, k] + 1)
+				radiance_map[i, j, k] = float(eup/edown)
 				HDR_output[i, j, k] = np.exp(float(eup/edown))
-	
-	cv2.imwrite("output.hdr", HDR_output)
-	np.save("hdr.npy", HDR_output)
+	plt.imshow(radiance_map[:, :, 0], origin="lower", cmap='rainbow', interpolation='nearest')
+	plt.gca().invert_yaxis()
+	plt.colorbar()
+	plt.title("Radiance Map")
+	plt.savefig("output/radiance_map.png", dpi = 300)
+	plt.show()
+	#cv2.imwrite("output.hdr", HDR_output)
+	#np.save("hdr.npy", HDR_output)
 	return HDR_output
 
 def intensityAdjustment(image, template):
@@ -172,7 +175,7 @@ def main():
 		g = np.zeros((256, 3))
 
 		for i in range(3):
-			x = HDR(A[:, :, i], B, Z[:, :, i], b[:, :, i])
+			x = HDR(A[:, :, i], B, Z[:, :, i], b[:, :, i], l)
 			print(x.shape)
 			g[:, i] = x[: n].reshape(n)
 			"""for j in range(n):
@@ -180,9 +183,15 @@ def main():
 					g[j, i] = -3"""
 			lE = x[n: x.shape[0]]
 
+		# plot response curve
 		pixel_range = np.arange(256)
-		plot = plt.plot(pixel_range, g[:, 0])
-		#plt.show()
+		plot1 = plt.plot(pixel_range, g[:, 0], 'r')
+		plot2 = plt.plot(pixel_range, g[:, 1], 'g')
+		plot3 = plt.plot(pixel_range, g[:, 2], 'b')
+		plt.title("response curve")
+		plt.savefig("./output/response_curve.png")
+		plt.show()
+		plt.close('all')
 
 		HDR_output = build_HDR_image(imgs, g, B)
 	output = bilateral(HDR_output, args)
