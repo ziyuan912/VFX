@@ -10,7 +10,7 @@ from PIL import Image
 Zmin = 0
 Zmax = 255
 n = 256
-def read_imgs(file, filetype):
+def read_imgs(file):
 	imgs = list()
 	P = 0
 	B = []
@@ -21,12 +21,11 @@ def read_imgs(file, filetype):
 		if "# Number of Images" in lines[i]:
 			P = int(lines[i+1])
 			i += 1
-		elif "# Filename  1/shutter_speed f/stop gain(db) ND_filters" in lines[i]:
+		elif "# Filename  1/shutter_speed" in lines[i]:
 			i += 1
 			while i < len(lines):
 				feature = lines[i].split()
-				filename = feature[0].split('.')
-				imgs.append(cv2.imread(filename[0] + filetype))
+				imgs.append(cv2.imread(feature[0]))
 				B.append(np.log(1/float(feature[1])))
 				i += 1
 	return imgs, B, P
@@ -139,14 +138,13 @@ def intensityAdjustment(image, template):
 def main():
 	parser = argparse.ArgumentParser(description='Process some images to do HDR.')
 	parser.add_argument("--file", help="input image feature file name")
-	parser.add_argument("--filetype", help="file type", default=".png")
 	parser.add_argument("--N", help="number of sample pixel", type=int ,default=256)
 	parser.add_argument("--l", help="determine the amount of smoothness", type=float, default=100)
 	parser.add_argument("--filter_size", help="determine the gaussion filter size", type=int, default=5)
 	parser.add_argument("--hdr_file", default=None)
 	args = parser.parse_args()
 
-	imgs, B, P = read_imgs(args.file, args.filetype)
+	imgs, B, P = read_imgs(args.file)
 	HDR_output = np.zeros((imgs[0].shape[0], imgs[0].shape[1], 3), dtype='float32')
 	if args.hdr_file != None:
 		HDR_output = np.load(args.hdr_file)
