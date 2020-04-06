@@ -5,6 +5,7 @@ import argparse
 import random
 import cv2
 from PIL import Image
+from tqdm import tqdm as tqdm
 
 
 Zmin = 0
@@ -30,6 +31,70 @@ def read_imgs(file):
 				B.append(np.log(1/float(feature[1])))
 				i += 1
 	return imgs, B, P
+
+def Shift(bitmap1, bitmap2, exclusionMaps1, exclusionMaps2, scale):
+	if(scale < 0):
+		return [0, 0]
+
+	b1, b2, eb1, eb2 = DownSampling([bitmap1, bitmap2, exclusionMaps1, exclusionMaps2], 50)
+	xs, ys = Shift(b1, b2, eb1, eb2, scale-1)
+	xs *= 2
+	ys *= 2
+
+	shift = [0, 0]
+	min_err = bitmap1.shape[0] * bitmap2.shape[1]
+
+	for x in [-1, 0, 1]:
+		for y in [-1, 0, 1]:
+			M = np.float32([[1, 0, xs+x],[0, 1, ys+y]])
+			shift_b2 = cv2.warpAffine(bitmap2 ,M, (bitmap2.shape[1], bitmap2.shape[0]))
+			shift_eb2 = cv2.warpAffine(exclusionMaps2 ,M, (bitmap2.shape[1], bitmap2.shape[0]))
+
+			diff_b = np.logical_xor(bitmap1, shift_b2)
+			diff_b = np.logical_and(diff_b, exclusionMaps1)
+			diff_b = np.logical_and(diff_b, shift_eb2)
+
+			err = np.count_nonzero(diff_b)
+			if(err < min_err):
+				shift = [x, y]
+				min_err = err
+	shift[0] += xs
+	shift[1] += ys
+	return shift
+
+def MTBAlign(Images, scale=5):
+	"""
+	Align images to the same position.
+	"""
+	P = len(Images)
+	Size = [Images[0].shape[0], Images[0].shape[1]]
+	alignImages = np.zeros((P, Size[0], Size[1], 3))
+
+	greyImages = np.zeros((P, Size[0], Size[1]))
+	for i in range(P):
+		b, g, r = cv2.split(Images[i])
+		r = np.array(r, dtype=np.float32)
+		g = np.array(g, dtype=np.float32)
+		b = np.array(b, dtype=np.float32)
+		greyImages[i] = (54 * r + 183 * g + 19 * b)/256
+
+	bitmap = np.zeros((P, Size[0], Size[1]))
+	exclusionMaps = np.zeros((P, Size[0], Size[1]))
+	for i in range(P):
+		t1, median, t2 = np.percentile(greyImages[i], [40, 50, 60])
+		bitmap[i] = np.where(greyImages[i] > median, 1, 0)
+		exclusionMaps[i] = np.where(np.logical_or(greyImages[i] < t1, greyImages[i] > t2), 1, 0)
+
+	standard = int(P/2)
+	for i in tqdm(range(P)):
+		if(i == standard):
+			alignImages[i] = Images[i]
+			continue
+		xs, ys = Shift(bitmap[standard], bitmap[i], exclusionMaps[standard], exclusionMaps[i], scale)
+		M = np.float32([[1, 0, xs],[0, 1, ys]])
+		alignImages[i] = cv2.warpAffine(Images[i] ,M, (Size[1], Size[0]))
+
+	return alignImages
 
 def get_sample_point(imgs, intensity, median, channel):
 	"""for i in range(imgs[median].shape[0]):
@@ -158,6 +223,8 @@ def main():
 	args = parser.parse_args()
 
 	imgs, B, P = read_imgs(args.file)
+	imgs = MTBAlign(imgs)
+	
 	HDR_output = np.zeros((imgs[0].shape[0], imgs[0].shape[1], 3), dtype='float32')
 	if args.hdr_file != None:
 		HDR_output = np.load(args.hdr_file)
