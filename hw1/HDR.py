@@ -190,7 +190,7 @@ def bilateral(img, args):
 
 def build_HDR_image(imgs, g, t_delta):
 	HDR_output = np.zeros((imgs[0].shape[0], imgs[0].shape[1], 3), dtype='float32')
-	for i in range(imgs[0].shape[0]):
+	for i in tqdm(range(imgs[0].shape[0])):
 		for j in range(imgs[0].shape[1]):
 			for k in range(3):
 				eup = 0
