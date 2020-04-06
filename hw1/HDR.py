@@ -10,6 +10,7 @@ from PIL import Image
 Zmin = 0
 Zmax = 255
 n = 256
+N = 256
 def read_imgs(file):
 	imgs = list()
 	P = 0
@@ -30,12 +31,25 @@ def read_imgs(file):
 				i += 1
 	return imgs, B, P
 
+def get_sample_point(imgs, intensity, median, channel):
+	"""for i in range(imgs[median].shape[0]):
+		for j in range(imgs[median].shape[1]):
+			if imgs[median][i][j][channel] == intensity:
+				intensity_points.append((i, j))"""
+	output_row, output_col = np.where(imgs[median][:, :, channel] == intensity)
+	if len(output_row) == 0:
+		return (random.randint(50, imgs[0].shape[0]-50), random.randint(50, imgs[0].shape[1]-50))
+	rnd = random.randrange(len(output_row))
+	return (output_row[rnd], output_col[rnd])
+
 def Z_generator(imgs, img_shape, N):
 	Z = np.zeros((N, len(imgs), 3))
 	for i in range(N):
-		rand_point = (random.randint(50, img_shape[0]-50), random.randint(50, img_shape[1]-50))
-		for j in range(len(imgs)):
-			Z[i, j] = imgs[j][rand_point[0], rand_point[1]]
+		for k in range(3):
+			sample_point = get_sample_point(imgs, i, len(imgs) // 2, k)
+			#rand_point = (random.randint(50, img_shape[0]-50), random.randint(50, img_shape[1]-50))
+			for j in range(len(imgs)):			
+				Z[i, j] = imgs[j][sample_point[0], sample_point[1]]
 	Z = Z.astype(int)
 	return Z
 
@@ -138,7 +152,6 @@ def intensityAdjustment(image, template):
 def main():
 	parser = argparse.ArgumentParser(description='Process some images to do HDR.')
 	parser.add_argument("--file", help="input image feature file name")
-	parser.add_argument("--N", help="number of sample pixel", type=int ,default=256)
 	parser.add_argument("--l", help="determine the amount of smoothness", type=float, default=100)
 	parser.add_argument("--filter_size", help="determine the gaussion filter size", type=int, default=5)
 	parser.add_argument("--hdr_file", default=None)
@@ -151,7 +164,7 @@ def main():
 	else:
 		l = args.l
 
-		Z = Z_generator(imgs, imgs[0].shape, args.N)
+		Z = Z_generator(imgs, imgs[0].shape, N)
 		A = np.zeros((Z.shape[0] * Z.shape[1] + n + 1, n + Z.shape[0], 3) )
 		B = np.array(B)
 		b = np.zeros((A.shape[0], 1, 3))
