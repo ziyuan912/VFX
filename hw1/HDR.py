@@ -32,6 +32,18 @@ def read_imgs(file):
 				i += 1
 	return imgs, B, P
 
+def DownSampling(Images, ScalePercent=10):
+    """
+    Resize the Images
+    """
+    width = int(Images[0].shape[1] * ScalePercent / 100)
+    height = int(Images[0].shape[0] * ScalePercent / 100)
+    dim = (width, height)
+    ResizeImages = []
+    for i in range(len(Images)):
+        ResizeImages.append(cv2.resize(Images[i], dim, interpolation = cv2.INTER_AREA))
+    return ResizeImages
+
 def Shift(bitmap1, bitmap2, exclusionMaps1, exclusionMaps2, scale):
 	if(scale < 0):
 		return [0, 0]
@@ -68,7 +80,7 @@ def MTBAlign(Images, scale=5):
 	"""
 	P = len(Images)
 	Size = [Images[0].shape[0], Images[0].shape[1]]
-	alignImages = np.zeros((P, Size[0], Size[1], 3))
+	alignImages = []
 
 	greyImages = np.zeros((P, Size[0], Size[1]))
 	for i in range(P):
@@ -88,11 +100,11 @@ def MTBAlign(Images, scale=5):
 	standard = int(P/2)
 	for i in tqdm(range(P)):
 		if(i == standard):
-			alignImages[i] = Images[i]
+			alignImages.append(Images[i])
 			continue
 		xs, ys = Shift(bitmap[standard], bitmap[i], exclusionMaps[standard], exclusionMaps[i], scale)
 		M = np.float32([[1, 0, xs],[0, 1, ys]])
-		alignImages[i] = cv2.warpAffine(Images[i] ,M, (Size[1], Size[0]))
+		alignImages.append(cv2.warpAffine(Images[i] ,M, (Size[1], Size[0])).astype(np.uint8))
 
 	return alignImages
 
