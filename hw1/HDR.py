@@ -187,7 +187,7 @@ def bilateral(img, args):
 	log_detail = log_intensity - log_large_scale
 	#plt.imshow(Image.fromarray(np.exp(log_large_scale)))
 	#plt.imshow(Image.fromarray(np.exp(log_detail)))
-	log_output = log_large_scale * 0.85 + log_detail
+	log_output = log_large_scale * args.compression + log_detail
 	output = np.zeros((img.shape[0], img.shape[1], 3))
 	output[:, :, 0] = img[:, :, 0]/intensity * np.exp(log_output)
 	output[:, :, 1] = img[:, :, 1]/intensity * np.exp(log_output)
@@ -219,13 +219,12 @@ def build_HDR_image(imgs, g, t_delta):
 	#np.save("hdr.npy", HDR_output)
 	return HDR_output
 
-def intensityAdjustment(image, template):
+def intensityAdjustment(image, origin_image):
     g, b, r = cv2.split(image)
-    tg, tb, tr = cv2.split(template)
+    tg, tb, tr = cv2.split(origin_image)
     b *= np.average(tb) / np.nanmean(b)
     g *= np.average(tg) / np.nanmean(g)
     r *= np.average(tr) / np.nanmean(r)
-    # image = np.average(template) / np.nanmean(image) * image
     image = cv2.merge((g,b,r))
     return image
 
@@ -234,6 +233,7 @@ def main():
 	parser.add_argument("--file", help="input image feature file name")
 	parser.add_argument("--l", help="determine the amount of smoothness", type=float, default=100)
 	parser.add_argument("--filter_size", help="determine the gaussion filter size", type=int, default=5)
+	parser.add_argument("--compression", help="the compression factor of tone mapping", type=float, default=0.8)
 	parser.add_argument("--hdr_file", default=None)
 	args = parser.parse_args()
 
