@@ -111,7 +111,7 @@ def MTBAlign(Images, scale=5):
 def get_sample_point(imgs, intensity, median, channel):
 	output_row, output_col = np.where(imgs[median][:, :, channel] == intensity)
 	if len(output_row) == 0:
-		return (random.randint(50, imgs[0].shape[0]-50), random.randint(50, imgs[0].shape[1]-50))
+		return (random.randint(0, imgs[0].shape[0]-1), random.randint(0, imgs[0].shape[1]-1))
 	rnd = random.randrange(len(output_row))
 	return (output_row[rnd], output_col[rnd])
 
@@ -119,8 +119,8 @@ def Z_generator(imgs, img_shape, N):
 	Z = np.zeros((N, len(imgs), 3))
 	for i in range(N):
 		for k in range(3):
-			#sample_point = get_sample_point(imgs, i, len(imgs) // 2, k)
-			sample_point = (random.randint(50, img_shape[0]-50), random.randint(50, img_shape[1]-50))
+			sample_point = get_sample_point(imgs, i, len(imgs) // 2, k)
+			#sample_point = (random.randint(0, img_shape[0]-1), random.randint(0, img_shape[1]-1))
 			for j in range(len(imgs)):			
 				Z[i, j] = imgs[j][sample_point[0], sample_point[1]]
 	Z = Z.astype(int)
@@ -181,7 +181,7 @@ def bilateral(img, args):
 	intensity = 0.2126*img[:, :, 0] + 0.7152*img[:, :, 1] + 0.0722*img[:, :, 2]
 	log_intensity = np.log(intensity)
 	log_large_scale = np.zeros(log_intensity.shape)
-	for i in range(log_large_scale.shape[0]):
+	for i in tqdm(range(log_large_scale.shape[0])):
 		for j in range(log_large_scale.shape[1]):
 			log_large_scale[i, j] = bilateral_filter(log_intensity, i, j, args)
 	log_detail = log_intensity - log_large_scale
@@ -213,13 +213,13 @@ def build_HDR_image(imgs, g, t_delta):
 	plt.gca().invert_yaxis()
 	plt.colorbar()
 	plt.title("Radiance Map")
-	plt.savefig("output/radiance_map.png", dpi = 300)
-	plt.show()
+	plt.savefig("output/radiance_map2.png", dpi = 300)
+	#plt.show()
 	#cv2.imwrite("output.hdr", HDR_output)
 	#np.save("hdr.npy", HDR_output)
 	return HDR_output
 
-def intensityAdjustment(image, template):
+def output_rescale(image, template):
     g, b, r = cv2.split(image)
     tg, tb, tr = cv2.split(template)
     b *= np.average(tb) / np.nanmean(b)
@@ -238,7 +238,8 @@ def main():
 	args = parser.parse_args()
 
 	imgs, B, P = read_imgs(args.file)
-	imgs = MTBAlign(imgs)
+	#imgs = DownSampling(imgs, 10)
+	imgs = MTBAlign(imgs, 5)
 	
 	HDR_output = np.zeros((imgs[0].shape[0], imgs[0].shape[1], 3), dtype='float32')
 	if args.hdr_file != None:
@@ -268,16 +269,16 @@ def main():
 		plot2 = plt.plot(pixel_range, g[:, 1], 'g')
 		plot3 = plt.plot(pixel_range, g[:, 2], 'b')
 		plt.title("response curve")
-		plt.savefig("./output/response_curve.png")
-		plt.show()
+		plt.savefig("./output/response_curve2.png")
+		#plt.show()
 		plt.close('all')
 
 		HDR_output = build_HDR_image(imgs, g, B)
 	output = bilateral(HDR_output, args)
 	for i in range(3):
 		output[:, :, i] = cv2.normalize(output[:, :, i], np.array([]), alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
-	output = intensityAdjustment(output, imgs[0])
-	cv2.imwrite("tonemap.jpg", output)
+	output = output_rescale(output, imgs[3])
+	cv2.imwrite("tonemap2.jpg", output)
 
 
 
