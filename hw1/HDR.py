@@ -231,9 +231,11 @@ def intensityAdjustment(image, origin_image):
 def main():
 	parser = argparse.ArgumentParser(description='Process some images to do HDR.')
 	parser.add_argument("--file", help="input image feature file name")
+	parser.add_argument("--downsample", help="downsample the input image into specified scale to speed up the calculation", type=float, default = 1)
 	parser.add_argument("--l", help="determine the amount of smoothness", type=float, default=100)
 	parser.add_argument("--filter_size", help="determine the gaussion filter size", type=int, default=5)
 	parser.add_argument("--compression", help="the compression factor of tone mapping", type=float, default=0.8)
+	parser.add_argument("--output", help="the output file file name")
 	parser.add_argument("--hdr_file", default=None)
 	args = parser.parse_args()
 
@@ -277,7 +279,7 @@ def main():
 	for i in range(3):
 		output[:, :, i] = cv2.normalize(output[:, :, i], np.array([]), alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
 	output = intensityAdjustment(output, imgs[0])
-	cv2.imwrite("tonemap.jpg", output)
+	cv2.imwrite(args.output, output)
 
 
 
