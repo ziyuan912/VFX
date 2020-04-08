@@ -178,7 +178,7 @@ def bilateral_filter(log_intensity, x, y, args):
 	return output
 
 def bilateral(img, args):
-	intensity = 0.2126*img[:, :, 0] + 0.7152*img[:, :, 1] + 0.0722*img[:, :, 2]
+	intensity = 0.0722*img[:, :, 0] + 0.7152*img[:, :, 1] + 0.2126*img[:, :, 2]
 	log_intensity = np.log(intensity)
 	log_large_scale = np.zeros(log_intensity.shape)
 	for i in tqdm(range(log_large_scale.shape[0])):
@@ -221,12 +221,35 @@ def build_HDR_image(imgs, g, t_delta):
 
 def output_rescale(image, origin_image):
     g, b, r = cv2.split(image)
-    tg, tb, tr = cv2.split(origin_image)
-    b *= np.average(tb) / np.nanmean(b)
-    g *= np.average(tg) / np.nanmean(g)
-    r *= np.average(tr) / np.nanmean(r)
+    g2, b2, r2 = cv2.split(origin_image)
+    b *= np.average(b2) / np.nanmean(b)
+    g *= np.average(g2) / np.nanmean(g)
+    r *= np.average(r2) / np.nanmean(r)
     image = cv2.merge((g,b,r))
     return image
+
+def output_rescale_all(image, origin_images):
+	g, b, r = cv2.split(image)
+	mean_image = np.zeros((image.shape[0], image.shape[1], 3))
+	for i in tqdm(range(image.shape[0])):
+		for j in range(image.shape[1]):
+			for k in range(3):
+				wsum = 0
+				pixelvalue = 0
+				for l in range(len(origin_images)):
+					w = W(origin_images[l][i, j, k])
+					pixelvalue += w * origin_images[l][i, j, k]
+					wsum += w
+				mean_image[i, j, k] = pixelvalue / wsum
+	g2, b2, r2 = cv2.split(mean_image)
+	b *= np.average(b2) / np.nanmean(b)
+	g *= np.average(g2) / np.nanmean(g)
+	r *= np.average(r2) / np.nanmean(r)
+	image = cv2.merge((g,b,r))
+	return image
+
+
+
 
 def main():
 	parser = argparse.ArgumentParser(description='Process some images to do HDR.')
@@ -240,7 +263,7 @@ def main():
 	args = parser.parse_args()
 
 	imgs, B, P = read_imgs(args.file)
-	#imgs = DownSampling(imgs, 10)
+	imgs = DownSampling(imgs, 10)
 	imgs = MTBAlign(imgs, 5)
 	
 	HDR_output = np.zeros((imgs[0].shape[0], imgs[0].shape[1], 3), dtype='float32')
@@ -279,9 +302,11 @@ def main():
 	output = bilateral(HDR_output, args)
 	for i in range(3):
 		output[:, :, i] = cv2.normalize(output[:, :, i], np.array([]), alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
-	output = output_rescale(output, imgs[3])
-	cv2.imwrite("tonemap2.jpg", output)
-
+	#for i in range(len(imgs)):		
+	#	output = output_rescale(output, imgs[i])
+	#	cv2.imwrite("rescale_ex" + str(i) + ".jpg", output)
+	output = output_rescale_all(output, imgs)
+	cv2.imwrite("rescale_exall.jpg", output)
 
 
 
