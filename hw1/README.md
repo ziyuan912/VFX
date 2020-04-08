@@ -97,15 +97,25 @@ Where
 ## Experiment
 
 ### Rescale for Normalization
+The result of using different image to rescale is shown below. We think the result using weighted image and image 3 are both good, but using weigted image to produce result is more stable than using single image, so we dicided to use weighted image as our final submission.
 ![](https://i.imgur.com/PDCxJdP.jpg)
 
 ### Compression Factor for Contrast Reducing
+We chose the optimal compression factor that have preserve the most details and the most obvious color contrast subjectively. Compression factor = 0.7 seems to be the best for us.
 ![](https://i.imgur.com/r6Lqd9r.jpg)
 
 
 ## Result
 The result is stored in `output/output.jpg`, and the input image is stored under `images/`.
 ### Input
+We shoot the photos with focal length 4.8mm, aperture f/8 and shutterspeed 8sec, 4sec, 2sec, 1sec, 0.5sec, 0.25sec, 0.125sec, 0.0625sec, 0.03125sec respectively.
+![](https://i.imgur.com/94PMSUA.jpg)
+
 ### Response Curve
+![](https://i.imgur.com/W6SJaDE.png)
+
 ### Radiance Map
+![](https://i.imgur.com/SsfiO7k.jpg)
+
 ### Output
+![](https://i.imgur.com/6Db1d8i.jpg)
