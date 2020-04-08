@@ -192,7 +192,6 @@ def bilateral(img, args):
 	output[:, :, 0] = img[:, :, 0]/intensity * np.exp(log_output)
 	output[:, :, 1] = img[:, :, 1]/intensity * np.exp(log_output)
 	output[:, :, 2] = img[:, :, 2]/intensity * np.exp(log_output)
-	print(output)
 	return output
 
 
@@ -258,12 +257,12 @@ def main():
 	parser.add_argument("--l", help="determine the amount of smoothness", type=float, default=100)
 	parser.add_argument("--filter_size", help="determine the gaussion filter size", type=int, default=5)
 	parser.add_argument("--compression", help="the compression factor of tone mapping", type=float, default=0.8)
-	parser.add_argument("--output", help="the output file file name")
+	parser.add_argument("--output", help="the output file file name", default="output.jpg")
 	parser.add_argument("--hdr_file", default=None)
 	args = parser.parse_args()
 
 	imgs, B, P = read_imgs(args.file)
-	imgs = DownSampling(imgs, 10)
+	imgs = DownSampling(imgs, args.downsample)
 	imgs = MTBAlign(imgs, 5)
 	
 	HDR_output = np.zeros((imgs[0].shape[0], imgs[0].shape[1], 3), dtype='float32')
@@ -281,7 +280,6 @@ def main():
 
 		for i in range(3):
 			x = HDR(A[:, :, i], B, Z[:, :, i], b[:, :, i], l)
-			print(x.shape)
 			g[:, i] = x[: n].reshape(n)
 			"""for j in range(n):
 				if g[j, i] < -3:
@@ -306,7 +304,7 @@ def main():
 	#	output = output_rescale(output, imgs[i])
 	#	cv2.imwrite("rescale_ex" + str(i) + ".jpg", output)
 	output = output_rescale_all(output, imgs)
-	cv2.imwrite("rescale_exall.jpg", output)
+	cv2.imwrite(args.output, output)
 
 
 
