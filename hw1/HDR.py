@@ -216,16 +216,16 @@ def build_HDR_image(imgs, g, t_delta):
 	return HDR_output
 
 def output_rescale(image, origin_image):
-    g, b, r = cv2.split(image)
-    g2, b2, r2 = cv2.split(origin_image)
+    b, g, r = cv2.split(image)
+    b2, g2, r2 = cv2.split(origin_image)
     b *= np.average(b2) / np.nanmean(b)
     g *= np.average(g2) / np.nanmean(g)
     r *= np.average(r2) / np.nanmean(r)
-    image = cv2.merge((g,b,r))
+    image = cv2.merge((b,g,r))
     return image
 
 def output_rescale_all(image, origin_images):
-	g, b, r = cv2.split(image)
+	b, g, r = cv2.split(image)
 	mean_image = np.zeros((image.shape[0], image.shape[1], 3))
 	print("------------ rescaling output ------------")
 	for i in tqdm(range(image.shape[0])):
@@ -238,11 +238,11 @@ def output_rescale_all(image, origin_images):
 					pixelvalue += w * origin_images[l][i, j, k]
 					wsum += w
 				mean_image[i, j, k] = pixelvalue / wsum
-	g2, b2, r2 = cv2.split(mean_image)
+	b2, g2, r2 = cv2.split(mean_image)
 	b *= np.average(b2) / np.nanmean(b)
 	g *= np.average(g2) / np.nanmean(g)
 	r *= np.average(r2) / np.nanmean(r)
-	image = cv2.merge((g,b,r))
+	image = cv2.merge((b,g,r))
 	return image
 
 
@@ -251,7 +251,7 @@ def output_rescale_all(image, origin_images):
 def main():
 	parser = argparse.ArgumentParser(description='Process some images to do HDR.')
 	parser.add_argument("--file", help="input image feature file name")
-	parser.add_argument("--downsample", help="downsample the input image into specified scale to speed up the calculation", type=float, default = 1)
+	parser.add_argument("--downsample", help="downsample the input image into specified scale to speed up the calculation", type=float, default = 10)
 	parser.add_argument("--l", help="determine the amount of smoothness", type=float, default=100)
 	parser.add_argument("--filter_size", help="determine the gaussion filter size", type=int, default=5)
 	parser.add_argument("--compression", help="the compression factor of tone mapping", type=float, default=0.8)
@@ -260,7 +260,7 @@ def main():
 
 	imgs, B, P = read_imgs(args.file)
 	imgs = DownSampling(imgs, args.downsample)
-	imgs = MTBAlign(imgs, 5)
+	imgs = MTBAlign(imgs, 3)
 	
 	HDR_output = np.zeros((imgs[0].shape[0], imgs[0].shape[1], 3), dtype='float32')
 	l = args.l
@@ -290,8 +290,8 @@ def main():
 	output = bilateral(HDR_output, args)
 	for i in range(3):
 		output[:, :, i] = cv2.normalize(output[:, :, i], np.array([]), alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
-	output = output_rescale_all(output, imgs)
-	cv2.imwrite(args.output, output)
+	outputimg = output_rescale_all(output, imgs)
+	cv2.imwrite(args.output, outputimg)
 
 
 
