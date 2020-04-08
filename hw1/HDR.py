@@ -98,6 +98,7 @@ def MTBAlign(Images, scale=5):
 		exclusionMaps[i] = np.where(np.logical_or(greyImages[i] < t1, greyImages[i] > t2), 1, 0)
 
 	standard = int(P/2)
+	print("------------ image alignment ------------")
 	for i in tqdm(range(P)):
 		if(i == standard):
 			alignImages.append(Images[i])
@@ -120,7 +121,6 @@ def Z_generator(imgs, img_shape, N):
 	for i in range(N):
 		for k in range(3):
 			sample_point = get_sample_point(imgs, i, len(imgs) // 2, k)
-			#sample_point = (random.randint(0, img_shape[0]-1), random.randint(0, img_shape[1]-1))
 			for j in range(len(imgs)):			
 				Z[i, j] = imgs[j][sample_point[0], sample_point[1]]
 	Z = Z.astype(int)
@@ -181,12 +181,11 @@ def bilateral(img, args):
 	intensity = 0.0722*img[:, :, 0] + 0.7152*img[:, :, 1] + 0.2126*img[:, :, 2]
 	log_intensity = np.log(intensity)
 	log_large_scale = np.zeros(log_intensity.shape)
+	print("------------ tone mapping ------------")
 	for i in tqdm(range(log_large_scale.shape[0])):
 		for j in range(log_large_scale.shape[1]):
 			log_large_scale[i, j] = bilateral_filter(log_intensity, i, j, args)
 	log_detail = log_intensity - log_large_scale
-	#plt.imshow(Image.fromarray(np.exp(log_large_scale)))
-	#plt.imshow(Image.fromarray(np.exp(log_detail)))
 	log_output = log_large_scale * args.compression + log_detail
 	output = np.zeros((img.shape[0], img.shape[1], 3))
 	output[:, :, 0] = img[:, :, 0]/intensity * np.exp(log_output)
@@ -198,6 +197,7 @@ def bilateral(img, args):
 def build_HDR_image(imgs, g, t_delta):
 	HDR_output = np.zeros((imgs[0].shape[0], imgs[0].shape[1], 3), dtype='float32')
 	radiance_map = np.zeros((imgs[0].shape[0], imgs[0].shape[1], 3), dtype='float32')
+	print("------------ building HDR image ------------")
 	for i in tqdm(range(imgs[0].shape[0])):
 		for j in range(imgs[0].shape[1]):
 			for k in range(3):
@@ -212,10 +212,7 @@ def build_HDR_image(imgs, g, t_delta):
 	plt.gca().invert_yaxis()
 	plt.colorbar()
 	plt.title("Radiance Map")
-	plt.savefig("output/radiance_map2.png", dpi = 300)
-	#plt.show()
-	#cv2.imwrite("output.hdr", HDR_output)
-	#np.save("hdr.npy", HDR_output)
+	plt.savefig("output/radiance_map.png", dpi = 300)
 	return HDR_output
 
 def output_rescale(image, origin_image):
@@ -230,6 +227,7 @@ def output_rescale(image, origin_image):
 def output_rescale_all(image, origin_images):
 	g, b, r = cv2.split(image)
 	mean_image = np.zeros((image.shape[0], image.shape[1], 3))
+	print("------------ rescaling output ------------")
 	for i in tqdm(range(image.shape[0])):
 		for j in range(image.shape[1]):
 			for k in range(3):
@@ -257,8 +255,7 @@ def main():
 	parser.add_argument("--l", help="determine the amount of smoothness", type=float, default=100)
 	parser.add_argument("--filter_size", help="determine the gaussion filter size", type=int, default=5)
 	parser.add_argument("--compression", help="the compression factor of tone mapping", type=float, default=0.8)
-	parser.add_argument("--output", help="the output file file name", default="output.jpg")
-	parser.add_argument("--hdr_file", default=None)
+	parser.add_argument("--output", help="the output file file name", default="./output/output.jpg")
 	args = parser.parse_args()
 
 	imgs, B, P = read_imgs(args.file)
@@ -266,43 +263,33 @@ def main():
 	imgs = MTBAlign(imgs, 5)
 	
 	HDR_output = np.zeros((imgs[0].shape[0], imgs[0].shape[1], 3), dtype='float32')
-	if args.hdr_file != None:
-		HDR_output = np.load(args.hdr_file)
-	else:
-		l = args.l
+	l = args.l
 
-		Z = Z_generator(imgs, imgs[0].shape, N)
-		A = np.zeros((Z.shape[0] * Z.shape[1] + n + 1, n + Z.shape[0], 3) )
-		B = np.array(B)
-		b = np.zeros((A.shape[0], 1, 3))
+	Z = Z_generator(imgs, imgs[0].shape, N)
+	A = np.zeros((Z.shape[0] * Z.shape[1] + n + 1, n + Z.shape[0], 3) )
+	B = np.array(B)
+	b = np.zeros((A.shape[0], 1, 3))
 
-		g = np.zeros((256, 3))
+	g = np.zeros((256, 3))
 
-		for i in range(3):
-			x = HDR(A[:, :, i], B, Z[:, :, i], b[:, :, i], l)
-			g[:, i] = x[: n].reshape(n)
-			"""for j in range(n):
-				if g[j, i] < -3:
-					g[j, i] = -3"""
-			lE = x[n: x.shape[0]]
+	for i in range(3):
+		x = HDR(A[:, :, i], B, Z[:, :, i], b[:, :, i], l)
+		g[:, i] = x[: n].reshape(n)
+		lE = x[n: x.shape[0]]
 
-		# plot response curve
-		pixel_range = np.arange(256)
-		plot1 = plt.plot(pixel_range, g[:, 0], 'r')
-		plot2 = plt.plot(pixel_range, g[:, 1], 'g')
-		plot3 = plt.plot(pixel_range, g[:, 2], 'b')
-		plt.title("response curve")
-		plt.savefig("./output/response_curve2.png")
-		#plt.show()
-		plt.close('all')
+	# plot response curve
+	pixel_range = np.arange(256)
+	plot1 = plt.plot(pixel_range, g[:, 0], 'r')
+	plot2 = plt.plot(pixel_range, g[:, 1], 'g')
+	plot3 = plt.plot(pixel_range, g[:, 2], 'b')
+	plt.title("response curve")
+	plt.savefig("./output/response_curve.png")
+	plt.close('all')
 
-		HDR_output = build_HDR_image(imgs, g, B)
+	HDR_output = build_HDR_image(imgs, g, B)
 	output = bilateral(HDR_output, args)
 	for i in range(3):
 		output[:, :, i] = cv2.normalize(output[:, :, i], np.array([]), alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
-	#for i in range(len(imgs)):		
-	#	output = output_rescale(output, imgs[i])
-	#	cv2.imwrite("rescale_ex" + str(i) + ".jpg", output)
 	output = output_rescale_all(output, imgs)
 	cv2.imwrite(args.output, output)
 
