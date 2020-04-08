@@ -254,7 +254,7 @@ def main():
 	parser.add_argument("--downsample", help="downsample the input image into specified scale to speed up the calculation", type=float, default = 10)
 	parser.add_argument("--l", help="determine the amount of smoothness", type=float, default=100)
 	parser.add_argument("--filter_size", help="determine the gaussion filter size", type=int, default=5)
-	parser.add_argument("--compression", help="the compression factor of tone mapping", type=float, default=0.8)
+	parser.add_argument("--compression", help="the compression factor of tone mapping", type=float, default=0.7)
 	parser.add_argument("--output", help="the output file file name", default="./output/output.jpg")
 	args = parser.parse_args()
 
