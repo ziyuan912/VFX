@@ -18,6 +18,18 @@ def read_img(filename):
 			f.append(float(lines[i].split()[-1]))
 	return imgs, f
 
+def DownSampling(Images, ScalePercent=10):
+    """
+    Resize the Images
+    """
+    width = int(Images[0].shape[1] * ScalePercent / 100)
+    height = int(Images[0].shape[0] * ScalePercent / 100)
+    dim = (width, height)
+    ResizeImages = []
+    for i in range(len(Images)):
+        ResizeImages.append(cv2.resize(Images[i], dim, interpolation = cv2.INTER_AREA))
+    return ResizeImages
+
 def warping_imgs(imgs, fs):
 	warp_img = list()
 	for i in range(len(imgs)):
@@ -51,12 +63,84 @@ def warping(img, f):
 
 def blending(img1, img2, w):
 	output = np.zeros((img1.shape[0], img1.shape[1] + img2.shape[1] - w, 3), dtype = int)
+	print(output[:, img1.shape[1]:].shape, img1.shape)
 	output[:, :img1.shape[1] - w] = img1[:, :img1.shape[1] - w]
-	output[:, img1.shape[1]:] = img2[:, img2.shape[1] - w]
+	output[:, img1.shape[1]:, :] = img2[:, w:]
 	for i in range(w):
-		output[:, img1.shape[1] - w + i] = int(img1[:, img1.shape[1] - w + i] * (1 - float(1/w)) + img2[:, i] * (float(1/w)))
+		output[:, img1.shape[1] - w + i] = np.floor(img1[:, img1.shape[1] - w + i] * (1 - float(i/w)) + img2[:, i] * (float(i/w)))
 	cv2.imwrite("blending.png", output)
 	return output
+
+def multi_band_blending(img1, img2, overlap_w):
+	def preprocess(img1, img2, overlap_w):
+
+		w1 = img1.shape[1]
+		w2 = img2.shape[1]
+
+		shape = np.array(img1.shape)
+
+		shape[1] = w1 + w2 - overlap_w
+
+		subA, subB, mask = np.zeros(shape), np.zeros(shape), np.zeros(shape)
+		print("shape", shape, "img1:", img1.shape, "img2", img2.shape, "overlap", overlap_w)
+		subA[:, :w1] = img1
+		subB[:, w1 - overlap_w:] = img2
+		mask[:, :w1 - overlap_w // 2] = 1
+
+		return subA, subB, mask
+
+
+	def Gaussian(img, leveln):
+		GP = [img]
+		for i in range(leveln - 1):
+		    GP.append(cv2.pyrDown(GP[i]))
+		return GP
+
+
+	def Laplacian(img, leveln):
+		LP = []
+		for i in range(leveln - 1):
+		    next_img = cv2.pyrDown(img)
+		    # print(img.shape, cv2.pyrUp(next_img, img.shape[1::-1]).shape)
+		    LP.append(img - cv2.pyrUp(next_img, dstsize = img.shape[1::-1]))
+		    img = next_img
+		LP.append(img)
+		return LP
+
+
+	def blend_pyramid(LPA, LPB, MP):
+		blended = []
+		for i, M in enumerate(MP):
+			blended.append(LPA[i] * M + LPB[i] * (1.0 - M))
+		return blended
+
+
+	def reconstruct(LS):
+	    img = LS[-1]
+	    for lev_img in LS[-2::-1]:
+	        img = cv2.pyrUp(img, dstsize = lev_img.shape[1::-1])
+	        img += lev_img
+	    return img
+
+	subA, subB, mask = preprocess(img1, img2, overlap_w)
+
+	leveln = int(np.floor(np.log2(min(img1.shape[0], img1.shape[1], img2.shape[0], img2.shape[1]))))
+   
+	print("max level", leveln)
+	leveln = 8
+	print("level", leveln)
+	# Get Gaussian pyramid and Laplacian pyramid
+	MP = Gaussian(mask, leveln)
+	LPA = Laplacian(subA, leveln)
+	LPB = Laplacian(subB, leveln)
+
+    # Blend two Laplacian pyramidspass
+	blended = blend_pyramid(LPA, LPB, MP)
+
+	# Reconstruction process
+	result = np.clip(reconstruct(blended), 0, 255)
+	cv2.imwrite("output.png", result.astype(int))
+	return result.astype(int)
 
 def main():
 	parser = argparse.ArgumentParser(description='Process some images to do image stitching.')
@@ -65,7 +149,9 @@ def main():
 	args = parser.parse_args()
 
 	imgs, fs = read_img(args.file)
+	imgs = DownSampling(imgs, 10)
 	#warping(imgs[0], fs[0])
 	imgs = warping_imgs(imgs, fs)
+	multi_band_blending(imgs[7], imgs[6], 120)
 if __name__ == '__main__':
 	main()
