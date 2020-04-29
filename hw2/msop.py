@@ -6,7 +6,7 @@ from scipy.ndimage import filters
 from tqdm import tqdm as tqdm
 
 def ReadImages(path):
-	images = np.array([cv2.imread('{}/wraping{}.jpg'.format(path, i)) for i in range(18)])
+	images = np.array([cv2.imread('{}/wraping{}.jpg'.format(path, i)) for i in range(17)])
 	# images = np.array([cv2.imread('../test.jpg')])
 	return images
 
@@ -76,7 +76,7 @@ def HarrisCornerDetector(image, windowsize, descriptorwindow, k=0.05):
 
 	return np.asarray(features)
 
-def MultiScaleHarrisCornerDetector(images, windowsize, descriptorwindow, level=5):
+def MultiScaleHarrisCornerDetector(images, windowsize, descriptorwindow, level=1):
 	all_features = []
 	all_descriptors = []
 	for i in tqdm(range(len(images))):
@@ -175,7 +175,7 @@ def ImageMatching(images, matching_pairs):
 def main():
 	parser = argparse.ArgumentParser(description="Use Multi-Scale Oriented Patches to find features of images.")
 	parser.add_argument("-p", "--path", help="input path name of images")
-	parser.add_argument("-o", "--output", help="ouput path name of images", default='../output')
+	parser.add_argument("-o", "--output", help="ouput path name of images", default='./output')
 	# parser.add_argument("-f", "--featurenum", help="number of features", default=250)
 	parser.add_argument("-w", "--windowsize", help="window size", default=9)
 	parser.add_argument("-d", "--descriptorwindow", help="descriptor window size", default=5)	
