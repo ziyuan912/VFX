@@ -92,6 +92,20 @@ def MultiScaleHarrisCornerDetector(images, windowsize, descriptorwindow, level=5
 		features = np.vstack((arr for arr in features))
 		features = np.unique(features, axis=0)
 
+		# ## use cv
+		# gray = cv2.cvtColor(images[i],cv2.COLOR_BGR2GRAY)
+
+		# gray = np.float32(gray)
+		# dst = cv2.cornerHarris(gray,2,3,0.04)
+
+		# #result is dilated for marking the corners, not important
+		# dst = cv2.dilate(dst,None)
+
+		# # Threshold for an optimal value, it may vary depending on the image.
+		# for i, j in gray[dst>0.01*dst.max()]:
+		# 	features.append(np.array([i, j]))
+		# features = np.array(features)
+
 		## descriptor
 		descriptors = []
 		for x, y in features:
@@ -110,7 +124,7 @@ def MultiScaleHarrisCornerDetector(images, windowsize, descriptorwindow, level=5
 
 	return np.asarray(all_features), np.asarray(all_descriptors)
 
-def FeatureMatching(images, features, descriptors, match_distance=3000):
+def FeatureMatching(images, features, descriptors, match_distance=4000):
 	all_matching_pairs = []
 	for i in range(len(images)):
 		f1 = features[i]
@@ -118,7 +132,7 @@ def FeatureMatching(images, features, descriptors, match_distance=3000):
 		d1 = descriptors[i]
 		d2 = descriptors[i+1] if i+1 != len(images) else descriptors[0]
 		matching_pairs = []
-		for j in tqdm(range(len(d1))):
+		for j in tqdm(range(len(d1)-1)):
 			dif = []
 			if(f1[j][1] > images[0].shape[1]/2):
 				continue
@@ -138,18 +152,22 @@ def FeatureMatching(images, features, descriptors, match_distance=3000):
 
 def ImageMatching(images, matching_pairs):
 	match_image = images[0]
-	f = open('match.txt', 'w')
+	# f = open('match.txt', 'w')
 	for i in range(len(images)):
-		xdis = images[0].shape[1] + matching_pairs[i][:, 0, 1] - matching_pairs[i][:, 1,1]
-		# for j in range(len(matching_pairs)):
-		# 	xdis.append(images[0].shape[1] + matching_pairs[j][0][1] - matching_pairs[j][1][1])
-		xdis = int(np.mean(xdis))
+		x_allshift = matching_pairs[i][:, 0, 1] - matching_pairs[i][:, 1, 1] + images[0].shape[1]
+		w = 1/(abs(x_allshift-np.median(x_allshift))+1)
+		# print(x_allshift)
+		# print(w)
+		x_shift = int(np.average(x_allshift, weights=w))
+		# print(x_shift)
+
+		# x_shift = int(images[0].shape[1] + np.mean(matching_pairs[i][:, 0, 1]) - np.mean(matching_pairs[i][:, 1,1]))
+
 		nextimage = images[i+1] if i+1 != len(images) else images[0]
-		# match_image[:, :xdis+1] = (match_image[:, :xdis+1] + nextimage[:, -xdis:]) / 2
-		match_image = np.concatenate((nextimage[:, :-xdis//2], match_image[:, xdis//2:]), 1)
-		f.write(str(i) + ',' + str(xdis//2) + '\n')
-		cv2.imwrite('{}/matchimg{}.jpg'.format('../output', i), np.concatenate((nextimage[:, :-xdis//2], images[i][:, xdis//2:]), 1))
-	f.close()
+		match_image = np.concatenate((nextimage[:, :-x_shift//2], match_image[:, x_shift//2:]), 1)
+		# f.write(str(i) + ',' + str(x_shift//2) + '\n')
+		# cv2.imwrite('{}/matchimg{}.jpg'.format('../output', i), np.concatenate((nextimage[:, :-x_shift//2], images[i][:, x_shift//2:]), 1))
+	# f.close()
 
 
 	return match_image
@@ -157,7 +175,7 @@ def ImageMatching(images, matching_pairs):
 def main():
 	parser = argparse.ArgumentParser(description="Use Multi-Scale Oriented Patches to find features of images.")
 	parser.add_argument("-p", "--path", help="input path name of images")
-	parser.add_argument("-o", "--output", help="ouput path name of images", default='./output')
+	parser.add_argument("-o", "--output", help="ouput path name of images", default='../output')
 	# parser.add_argument("-f", "--featurenum", help="number of features", default=250)
 	parser.add_argument("-w", "--windowsize", help="window size", default=9)
 	parser.add_argument("-d", "--descriptorwindow", help="descriptor window size", default=5)	
@@ -166,8 +184,8 @@ def main():
 	images = ReadImages(args.path)
 
 	features, descriptors = MultiScaleHarrisCornerDetector(images, args.windowsize, args.descriptorwindow)
-	# np.save('features', features)
-	# np.save('descriptors', descriptors)
+	np.save('features', features)
+	np.save('descriptors', descriptors)
 
 
 	for i, img in enumerate(images):
@@ -192,8 +210,8 @@ def main():
 			cv2.line(pic, m1, m2, (255, 255, 0), 1)
 		cv2.imwrite('{}/matchingimg{}.jpg'.format(args.output, i), pic)
 
-	# match_image = ImageMatching(images, matching_pairs)
-	# cv2.imwrite('{}/matchimg.jpg'.format(args.output), match_image)
+	match_image = ImageMatching(images, matching_pairs)
+	cv2.imwrite('{}/matchimg.jpg'.format(args.output), match_image)
 
 
 if __name__ == '__main__':
