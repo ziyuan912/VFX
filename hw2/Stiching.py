@@ -71,6 +71,8 @@ def blending(img1, img2, w):
 	cv2.imwrite("blending.png", output)
 	return output
 
+
+	print("level", leveln)
 def multi_band_blending(img1, img2, overlap_w):
 	def preprocess(img1, img2, overlap_w):
 
@@ -128,7 +130,6 @@ def multi_band_blending(img1, img2, overlap_w):
    
 	print("max level", leveln)
 	leveln = 8
-	print("level", leveln)
 	# Get Gaussian pyramid and Laplacian pyramid
 	MP = Gaussian(mask, leveln)
 	LPA = Laplacian(subA, leveln)

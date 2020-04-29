@@ -108,6 +108,8 @@ def MultiScaleHarrisCornerDetector(images, windowsize, descriptorwindow, level=1
 
 		## descriptor
 		descriptors = []
+		img = np.copy(images[i])
+		img = (img-np.mean(img))/np.std(img)
 		for x, y in features:
 			descriptor = []
 			offset = descriptorwindow//2
@@ -116,7 +118,7 @@ def MultiScaleHarrisCornerDetector(images, windowsize, descriptorwindow, level=1
 					if(x + x_ >= images[i].shape[0] or y + y_ >= images[i].shape[1]):
 						descriptor.append(0)
 					else:
-						descriptor.append(images[i][x+x_, y+y_])
+						descriptor.append(img[x+x_, y+y_])
 			descriptors.append(np.asarray(descriptor))
 
 		all_features.append(features)
@@ -126,12 +128,14 @@ def MultiScaleHarrisCornerDetector(images, windowsize, descriptorwindow, level=1
 
 def FeatureMatching(images, features, descriptors, match_distance=4000):
 	all_matching_pairs = []
+	all_difs = []
 	for i in range(len(images)):
 		f1 = features[i]
 		f2 = features[i+1] if i+1 != len(images) else features[0]
 		d1 = descriptors[i]
 		d2 = descriptors[i+1] if i+1 != len(images) else descriptors[0]
 		matching_pairs = []
+		difs = []
 		for j in tqdm(range(len(d1)-1)):
 			dif = []
 			if(f1[j][1] > images[0].shape[1]/2):
@@ -145,26 +149,111 @@ def FeatureMatching(images, features, descriptors, match_distance=4000):
 				and f2[macth_point][1] > images[0].shape[1]/2
 				and np.absolute(f2[macth_point][0] - f1[j][0]) < 20):
 				matching_pairs.append(np.array([f1[j], f2[macth_point]]))
+				difs.append(dif[macth_point])
 		matching_pairs = np.asarray(matching_pairs)
 		all_matching_pairs.append(matching_pairs)
 		print('pic{}, match pairs:{}'.format(i, matching_pairs.shape[0]))
-	return np.asarray(all_matching_pairs)
+		all_difs.append(np.array(difs))
+	return np.asarray(all_matching_pairs), np.asarray(all_difs)
 
-def ImageMatching(images, matching_pairs):
+def blending(img1, img2, w):
+	output = np.zeros((img1.shape[0], img1.shape[1] + img2.shape[1] - w, 3), dtype = int)
+	print(output[:, img1.shape[1]:].shape, img1.shape)
+	output[:, :img1.shape[1] - w] = img1[:, :img1.shape[1] - w]
+	output[:, img1.shape[1]:, :] = img2[:, w:]
+	for i in range(w):
+		output[:, img1.shape[1] - w + i] = np.floor(img1[:, img1.shape[1] - w + i] * (1 - float(i/w)) + img2[:, i] * (float(i/w)))
+	cv2.imwrite("blending.png", output)
+	return output
+
+def multi_band_blending(img1, img2, overlap_w):
+	def preprocess(img1, img2, overlap_w):
+
+		w1 = img1.shape[1]
+		w2 = img2.shape[1]
+
+		shape = np.array(img1.shape)
+
+		shape[1] = w1 + w2 - overlap_w
+
+		subA, subB, mask = np.zeros(shape), np.zeros(shape), np.zeros(shape)
+		# print("shape", shape, "img1:", img1.shape, "img2", img2.shape, "overlap", overlap_w)
+		subA[:, :w1] = img1
+		subB[:, w1 - overlap_w:] = img2
+		mask[:, :w1 - overlap_w // 2] = 1
+
+		return subA, subB, mask
+
+
+	def Gaussian(img, leveln):
+		GP = [img]
+		for i in range(leveln - 1):
+		    GP.append(cv2.pyrDown(GP[i]))
+		return GP
+
+
+	def Laplacian(img, leveln):
+		LP = []
+		for i in range(leveln - 1):
+		    next_img = cv2.pyrDown(img)
+		    # print(img.shape, cv2.pyrUp(next_img, img.shape[1::-1]).shape)
+		    LP.append(img - cv2.pyrUp(next_img, dstsize = img.shape[1::-1]))
+		    img = next_img
+		LP.append(img)
+		return LP
+
+
+	def blend_pyramid(LPA, LPB, MP):
+		blended = []
+		for i, M in enumerate(MP):
+			blended.append(LPA[i] * M + LPB[i] * (1.0 - M))
+		return blended
+
+
+	def reconstruct(LS):
+	    img = LS[-1]
+	    for lev_img in LS[-2::-1]:
+	        img = cv2.pyrUp(img, dstsize = lev_img.shape[1::-1])
+	        img += lev_img
+	    return img
+
+	subA, subB, mask = preprocess(img1, img2, overlap_w)
+
+	leveln = int(np.floor(np.log2(min(img1.shape[0], img1.shape[1], img2.shape[0], img2.shape[1]))))
+   
+	# print("max level", leveln)
+	leveln = 8
+	# print("level", leveln)
+	# Get Gaussian pyramid and Laplacian pyramid
+	MP = Gaussian(mask, leveln)
+	LPA = Laplacian(subA, leveln)
+	LPB = Laplacian(subB, leveln)
+
+    # Blend two Laplacian pyramidspass
+	blended = blend_pyramid(LPA, LPB, MP)
+
+	# Reconstruction process
+	result = np.clip(reconstruct(blended), 0, 255)
+	cv2.imwrite("output.png", result.astype(int))
+	return result.astype(int)
+
+def ImageMatching(images, matching_pairs, difs):
 	match_image = images[0]
 	# f = open('match.txt', 'w')
 	for i in range(len(images)):
 		x_allshift = matching_pairs[i][:, 0, 1] - matching_pairs[i][:, 1, 1] + images[0].shape[1]
-		w = 1/(abs(x_allshift-np.median(x_allshift))+1)
-		# print(x_allshift)
-		# print(w)
+		dif = difs[i]
+		w = 1- (abs(dif-np.median(dif)))/max(np.max(dif)-np.median(dif), abs(np.min(dif)-np.median(dif)))
+		print(x_allshift)
+		print(w)
 		x_shift = int(np.average(x_allshift, weights=w))
-		# print(x_shift)
+		print(x_shift)
 
 		# x_shift = int(images[0].shape[1] + np.mean(matching_pairs[i][:, 0, 1]) - np.mean(matching_pairs[i][:, 1,1]))
 
 		nextimage = images[i+1] if i+1 != len(images) else images[0]
-		match_image = np.concatenate((nextimage[:, :-x_shift//2], match_image[:, x_shift//2:]), 1)
+		# match_image = np.concatenate((nextimage[:, :-x_shift//2], match_image[:, x_shift//2:]), 1)
+		match_image = multi_band_blending(nextimage, match_image, x_shift)
 		# f.write(str(i) + ',' + str(x_shift//2) + '\n')
 		# cv2.imwrite('{}/matchimg{}.jpg'.format('../output', i), np.concatenate((nextimage[:, :-x_shift//2], images[i][:, x_shift//2:]), 1))
 	# f.close()
@@ -186,6 +275,8 @@ def main():
 	features, descriptors = MultiScaleHarrisCornerDetector(images, args.windowsize, args.descriptorwindow)
 	np.save('features', features)
 	np.save('descriptors', descriptors)
+	# features = np.load('features.npy')
+	# descriptors = np.load('descriptors.npy')
 
 
 	for i, img in enumerate(images):
@@ -194,9 +285,11 @@ def main():
 			cv2.circle(image, (feature[1], feature[0]), 1, (0, 0, 255), -1)
 		cv2.imwrite('{}/img{}.jpg'.format(args.output, i), image)
 
-	matching_pairs = FeatureMatching(images, features, descriptors)
+	matching_pairs, difs = FeatureMatching(images, features, descriptors)
 	np.save('matching_pairs', matching_pairs)
+	np.save('difs', difs)
 	# matching_pairs = np.load('matching_pairs.npy')
+	# difs = np.load('difs.npy')
 
 	for i in range(len(images)):
 		img1 = np.copy(images[i])
@@ -210,7 +303,7 @@ def main():
 			cv2.line(pic, m1, m2, (255, 255, 0), 1)
 		cv2.imwrite('{}/matchingimg{}.jpg'.format(args.output, i), pic)
 
-	match_image = ImageMatching(images, matching_pairs)
+	match_image = ImageMatching(images, matching_pairs, difs)
 	cv2.imwrite('{}/matchimg.jpg'.format(args.output), match_image)
 
 
