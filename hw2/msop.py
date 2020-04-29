@@ -126,7 +126,7 @@ def MultiScaleHarrisCornerDetector(images, windowsize, descriptorwindow, level=5
 
 	return np.asarray(all_features), np.asarray(all_descriptors)
 
-def FeatureMatching(images, features, descriptors, match_distance=4000):
+def FeatureMatching(images, features, descriptors, match_distance=20):
 	all_matching_pairs = []
 	all_difs = []
 	for i in range(len(images)):
@@ -145,7 +145,7 @@ def FeatureMatching(images, features, descriptors, match_distance=4000):
 			macth_point = np.argsort(dif)[0]
 			second_match_point = np.argsort(dif)[1]
 			if(dif[macth_point] < match_distance 
-				and dif[second_match_point] - dif[macth_point] > 200
+				and dif[second_match_point] - dif[macth_point] > 1
 				and f2[macth_point][1] > images[0].shape[1]/2
 				and np.absolute(f2[macth_point][0] - f1[j][0]) < 20):
 				matching_pairs.append(np.array([f1[j], f2[macth_point]]))
@@ -290,7 +290,7 @@ def main():
 	np.save('difs', difs)
 	# matching_pairs = np.load('matching_pairs.npy')
 	# difs = np.load('difs.npy')
-
+	
 	for i in range(len(images)):
 		img1 = np.copy(images[i])
 		img2 = np.copy(images[i+1] if i+1 != len(images) else images[0])
