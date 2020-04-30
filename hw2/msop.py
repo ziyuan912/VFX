@@ -4,6 +4,7 @@ import cv2
 import matplotlib.pyplot as plt
 from scipy.ndimage import filters
 from tqdm import tqdm as tqdm
+from random import randint
 
 def ReadImages(path):
 	images = np.array([cv2.imread('{}/wraping{}.jpg'.format(path, i)) for i in range(17)])
@@ -177,7 +178,7 @@ def multi_band_blending(img1, img2, overlap_w):
 		shape[1] = w1 + w2 - overlap_w
 
 		subA, subB, mask = np.zeros(shape), np.zeros(shape), np.zeros(shape)
-		# print("shape", shape, "img1:", img1.shape, "img2", img2.shape, "overlap", overlap_w)
+		print("shape", shape, "img1:", img1.shape, "img2", img2.shape, "overlap", overlap_w)
 		subA[:, :w1] = img1
 		subB[:, w1 - overlap_w:] = img2
 		mask[:, :w1 - overlap_w // 2] = 1
@@ -243,10 +244,18 @@ def ImageMatching(images, matching_pairs, difs):
 	for i in range(len(images)):
 		x_allshift = matching_pairs[i][:, 0, 1] - matching_pairs[i][:, 1, 1] + images[0].shape[1]
 		dif = difs[i]
-		w = 1- (abs(dif-np.median(dif)))/max(np.max(dif)-np.median(dif), abs(np.min(dif)-np.median(dif)))
+		similar_max = 0
+		x_shift = [0, 0]
+		for shift in x_allshift:
+			similar_shift = np.sum(abs(x_allshift - shift) < 5)
+			print(similar_shift)
+			if similar_shift > similar_max:
+				similar_max = similar_shift
+				x_shift = shift
+		"""w = 1- (abs(dif-np.median(dif)))/max(np.max(dif)-np.median(dif), abs(np.min(dif)-np.median(dif)))
 		print(x_allshift)
 		print(w)
-		x_shift = int(np.average(x_allshift, weights=w))
+		x_shift = int(np.average(x_allshift, weights=w))"""
 		print(x_shift)
 
 		# x_shift = int(images[0].shape[1] + np.mean(matching_pairs[i][:, 0, 1]) - np.mean(matching_pairs[i][:, 1,1]))
@@ -285,11 +294,11 @@ def main():
 			cv2.circle(image, (feature[1], feature[0]), 1, (0, 0, 255), -1)
 		cv2.imwrite('{}/img{}.jpg'.format(args.output, i), image)
 
-	matching_pairs, difs = FeatureMatching(images, features, descriptors)
+	"""matching_pairs, difs = FeatureMatching(images, features, descriptors)
 	np.save('matching_pairs', matching_pairs)
-	np.save('difs', difs)
-	# matching_pairs = np.load('matching_pairs.npy')
-	# difs = np.load('difs.npy')
+	np.save('difs', difs)"""
+	matching_pairs = np.load('matching_pairs.npy')
+	difs = np.load('difs.npy')
 	
 	for i in range(len(images)):
 		img1 = np.copy(images[i])
