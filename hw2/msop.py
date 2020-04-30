@@ -245,7 +245,7 @@ def ImageMatching(images, matching_pairs, difs):
 		x_allshift = matching_pairs[i][:, 0, 1] - matching_pairs[i][:, 1, 1] + images[0].shape[1]
 		dif = difs[i]
 		similar_max = 0
-		x_shift = [0, 0]
+		x_shift = 0
 		for shift in x_allshift:
 			similar_shift = np.sum(abs(x_allshift - shift) < 5)
 			print(similar_shift)
