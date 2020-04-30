@@ -76,7 +76,7 @@ def HarrisCornerDetector(image, windowsize, descriptorwindow, k=0.05):
 
 	return np.asarray(features)
 
-def MultiScaleHarrisCornerDetector(images, windowsize, descriptorwindow, level=1):
+def MultiScaleHarrisCornerDetector(images, windowsize, descriptorwindow, level=5):
 	all_features = []
 	all_descriptors = []
 	for i in tqdm(range(len(images))):
