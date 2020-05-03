@@ -242,21 +242,22 @@ def ImageMatching(images, matching_pairs, difs):
 	match_image = images[0]
 	# f = open('match.txt', 'w')
 	for i in range(len(images)):
-		x_allshift = matching_pairs[i][:, 0, 1] - matching_pairs[i][:, 1, 1] + images[0].shape[1]
+		x_allshift = matching_pairs[i][:, 0, 1] - matching_pairs[i][:, 1, 1] + images[i].shape[1]
+		y_allshift = matching_pairs[i][:, 0, 0] - matching_pairs[i][:, 1, 0]
 		dif = difs[i]
 		similar_max = 0
 		x_shift = 0
-		for shift in x_allshift:
-			similar_shift = np.sum(abs(x_allshift - shift) < 5)
-			print(similar_shift)
+		y_shift = 0
+		for shift_idx in range(len(x_allshift)):
+			similar_shift = np.sum(abs(x_allshift - x_allshift[shift_idx] + y_allshift - y_allshift[shift_idx]) < 5)
 			if similar_shift > similar_max:
 				similar_max = similar_shift
-				x_shift = shift
+				x_shift = x_allshift[shift_idx]
+				y_shift = y_allshift[shift_idx]
 		"""w = 1- (abs(dif-np.median(dif)))/max(np.max(dif)-np.median(dif), abs(np.min(dif)-np.median(dif)))
 		print(x_allshift)
 		print(w)
 		x_shift = int(np.average(x_allshift, weights=w))"""
-		print(x_shift)
 
 		# x_shift = int(images[0].shape[1] + np.mean(matching_pairs[i][:, 0, 1]) - np.mean(matching_pairs[i][:, 1,1]))
 
