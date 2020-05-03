@@ -257,11 +257,11 @@ def ImageMatching(images, matching_pairs, difs):
 				similar_max[0] = similar_y_shift
 				shifts[0] = shift[0]
 		print(shifts)
+
 		"""w = 1- (abs(dif-np.median(dif)))/max(np.max(dif)-np.median(dif), abs(np.min(dif)-np.median(dif)))
 		print(x_allshift)
 		print(w)
 		x_shift = int(np.average(x_allshift, weights=w))"""
-		print(x_shift)
 
 		# x_shift = int(images[0].shape[1] + np.mean(matching_pairs[i][:, 0, 1]) - np.mean(matching_pairs[i][:, 1,1]))
 
