@@ -138,13 +138,15 @@ def FeatureMatching(images, features, descriptors, match_distance=20):
 		matching_pairs = []
 		difs = []
 		for j in tqdm(range(len(d1)-1)):
-			dif = []
 			if(f1[j][1] > images[0].shape[1]/2):
 				continue
-			for k in range(len(d2)):
-				dif.append(np.sum(np.absolute(d1[j]-d2[k])))
+
+			d1_ = np.concatenate([d1[j] for n in range(d2.shape[0])]).reshape((d2.shape[0], 25, 3))
+			dif = np.sum(np.sum(np.absolute(d1_ - d2), axis=1), axis=1)
+			dif = np.array(dif, dtype=np.float32)
 			macth_point = np.argsort(dif)[0]
 			second_match_point = np.argsort(dif)[1]
+
 			if(dif[macth_point] < match_distance 
 				and dif[second_match_point] - dif[macth_point] > 1
 				and f2[macth_point][1] > images[0].shape[1]/2
@@ -242,16 +244,19 @@ def ImageMatching(images, matching_pairs, difs):
 	match_image = images[0]
 	# f = open('match.txt', 'w')
 	for i in range(len(images)):
-		x_allshift = matching_pairs[i][:, 0, 1] - matching_pairs[i][:, 1, 1] + images[0].shape[1]
-		dif = difs[i]
-		similar_max = 0
-		x_shift = [0, 0]
-		for shift in x_allshift:
-			similar_shift = np.sum(abs(x_allshift - shift) < 5)
-			print(similar_shift)
-			if similar_shift > similar_max:
-				similar_max = similar_shift
-				x_shift = shift
+		allshift = matching_pairs[i][:, 0, :] - matching_pairs[i][:, 1, :] + [0, images[0].shape[1]]
+		similar_max = [0, 0]
+		shifts = [0, 0]
+		for shift in allshift:
+			similar_x_shift = np.sum(abs(allshift[1] - shift[1]) < 5)
+			if similar_x_shift > similar_max[1]:
+				similar_max[1] = similar_x_shift
+				shifts[1] = shift[1]
+			similar_y_shift = np.sum(abs(allshift[0] - shift[0]) < 2)
+			if similar_y_shift > similar_max[0]:
+				similar_max[0] = similar_y_shift
+				shifts[0] = shift[0]
+		print(shifts)
 		"""w = 1- (abs(dif-np.median(dif)))/max(np.max(dif)-np.median(dif), abs(np.min(dif)-np.median(dif)))
 		print(x_allshift)
 		print(w)
@@ -262,7 +267,7 @@ def ImageMatching(images, matching_pairs, difs):
 
 		nextimage = images[i+1] if i+1 != len(images) else images[0]
 		# match_image = np.concatenate((nextimage[:, :-x_shift//2], match_image[:, x_shift//2:]), 1)
-		match_image = multi_band_blending(nextimage, match_image, x_shift)
+		match_image = multi_band_blending(nextimage, match_image, shifts[1])
 		# f.write(str(i) + ',' + str(x_shift//2) + '\n')
 		# cv2.imwrite('{}/matchimg{}.jpg'.format('../output', i), np.concatenate((nextimage[:, :-x_shift//2], images[i][:, x_shift//2:]), 1))
 	# f.close()
