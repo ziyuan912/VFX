@@ -5,54 +5,47 @@ import matplotlib.pyplot as plt
 from scipy.ndimage import filters
 from tqdm import tqdm as tqdm
 from random import randint
+import math
 
 def ReadImages(path):
 	images = np.array([cv2.imread('{}/wraping{}.jpg'.format(path, i)) for i in range(17)])
 	# images = np.array([cv2.imread('../test.jpg')])
 	return images
 
-def HarrisCornerDetector(image, windowsize, descriptorwindow, k=0.05):
+def HarrisCornerDetector(image, windowsize, descriptorwindow, k=0.04):
 	features = []
 	img = np.copy(image)
 	gray_image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-	image_gaussianfilter = cv2.GaussianBlur(gray_image, (windowsize, windowsize), 1)
-	Ix = image_gaussianfilter - np.roll(image_gaussianfilter, -1, axis=1)
-	Iy = image_gaussianfilter - np.roll(image_gaussianfilter, -1, axis=0)
+	sigma = 3
+	imx = np.zeros(gray_image.shape)
+	imy = np.zeros(gray_image.shape)
+	filters.gaussian_filter(gray_image, (sigma, sigma), (0, 1), imx)
+	filters.gaussian_filter(gray_image, (sigma, sigma), (1, 0), imy)
 
-	Ixx = cv2.GaussianBlur(np.multiply(Ix, Ix), (windowsize, windowsize), 1)
-	Iyy = cv2.GaussianBlur(np.multiply(Iy, Iy), (windowsize, windowsize), 1)
-	Ixy = cv2.GaussianBlur(np.multiply(Ix, Iy), (windowsize, windowsize), 1)
+	# compute components of the Harris matrix
+	Ixx = filters.gaussian_filter(imx*imx,sigma)
+	Ixy = filters.gaussian_filter(imx*imy,sigma)
+	Iyy = filters.gaussian_filter(imy*imy,sigma)
 
 	det = Ixx*Iyy - Ixy**2
-	trace = Ixx+Iyy
+	trace = Ixx + Iyy
+	R = det - k * trace**2
 
-	## distance
+	# image_gaussianfilter = cv2.GaussianBlur(gray_image, (windowsize, windowsize), 1)
+	# Ix = image_gaussianfilter - np.roll(image_gaussianfilter, -1, axis=1)
+	# Iy = image_gaussianfilter - np.roll(image_gaussianfilter, -1, axis=0)
+
+	# Ixx = cv2.GaussianBlur(np.multiply(Ix, Ix), (windowsize, windowsize), 1)
+	# Iyy = cv2.GaussianBlur(np.multiply(Iy, Iy), (windowsize, windowsize), 1)
+	# Ixy = cv2.GaussianBlur(np.multiply(Ix, Iy), (windowsize, windowsize), 1)
+
+	# det = Ixx*Iyy - Ixy**2
+	# trace = Ixx+Iyy
 	# R = det - k*trace**2
-
-	# candidates = []
-	# for i in range(image.shape[0]):
-	# 	for j in range(image.shape[1]):
-	# 		candidates.append([i, j, R[i][j]])
-
-	# candidates.sort(key=lambda x:x[2], reverse=True)
-	# features.append(candidates.pop(0)[:2])
-
-	# while(len(features) < featurenum and candidates):
-	# 	candidate = candidates.pop(0)
-	# 	flag = 1
-	# 	for feature in features:
-	# 		xdis = feature[1]-candidate[1]
-	# 		ydis = feature[0]-candidate[0]
-	# 		if(xdis**2+ydis**2 <= windowsize**2):
-	# 			flag = 0
-	# 			break
-	# 	if(flag):
-	# 		features.append(candidate[:2])
 
 	## window size
 	offset = windowsize // 2
-	R = det - k*trace**2
 	R[:offset, :] = 0
 	R[-offset:, :] = 0
 	R[:, :offset] = 0
@@ -110,14 +103,21 @@ def MultiScaleHarrisCornerDetector(images, windowsize, descriptorwindow, level=5
 		## descriptor
 		descriptors = []
 		img = np.copy(images[i])
+		# gray_image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+		# image_gaussianfilter = cv2.GaussianBlur(gray_image, (5, 5), 4.5)
+		# Ix = image_gaussianfilter - np.roll(image_gaussianfilter, -1, axis=1)
+		# Iy = image_gaussianfilter - np.roll(image_gaussianfilter, -1, axis=0)
+		# angle = np.arccos(Ix / np.sqrt(Ix**2+Iy**2)) * 180 / math.pi
 		img = (img-np.mean(img))/np.std(img)
 		for x, y in features:
+			# M = cv2.getRotationMatrix2D((y, x), angle[x][y], 1)
+			# rotatedimg = cv2.warpAffine(img, M, (img.shape[1], img.shape[0]))
 			descriptor = []
 			offset = descriptorwindow//2
 			for x_ in range(-offset, offset+1):
 				for y_ in range(-offset, offset+1):
 					if(x + x_ >= images[i].shape[0] or y + y_ >= images[i].shape[1]):
-						descriptor.append(0)
+						descriptor.append([0, 0, 0])
 					else:
 						descriptor.append(img[x+x_, y+y_])
 			descriptors.append(np.asarray(descriptor))
@@ -129,35 +129,37 @@ def MultiScaleHarrisCornerDetector(images, windowsize, descriptorwindow, level=5
 
 def FeatureMatching(images, features, descriptors, match_distance=20):
 	all_matching_pairs = []
-	all_difs = []
 	for i in range(len(images)):
 		f1 = features[i]
 		f2 = features[i+1] if i+1 != len(images) else features[0]
 		d1 = descriptors[i]
 		d2 = descriptors[i+1] if i+1 != len(images) else descriptors[0]
 		matching_pairs = []
-		difs = []
 		for j in tqdm(range(len(d1)-1)):
 			if(f1[j][1] > images[0].shape[1]/2):
 				continue
 
 			d1_ = np.concatenate([d1[j] for n in range(d2.shape[0])]).reshape((d2.shape[0], 25, 3))
-			dif = np.sum(np.sum(np.absolute(d1_ - d2), axis=1), axis=1)
+			dif = np.sum(np.sum((d1_ - d2)**2, axis=1), axis=1)
 			dif = np.array(dif, dtype=np.float32)
 			macth_point = np.argsort(dif)[0]
 			second_match_point = np.argsort(dif)[1]
 
-			if(dif[macth_point] < match_distance 
-				and dif[second_match_point] - dif[macth_point] > 1
+			# if(dif[macth_point] < match_distance 
+			# 	and dif[second_match_point] - dif[macth_point] > 1
+			# 	and f2[macth_point][1] > images[0].shape[1]/2
+			# 	and np.absolute(f2[macth_point][0] - f1[j][0]) < 20):
+			# 	matching_pairs.append(np.array([f1[j], f2[macth_point]]))
+
+			is_match = dif[macth_point] == 0 or (dif[macth_point]/dif[second_match_point] < 0.9
 				and f2[macth_point][1] > images[0].shape[1]/2
-				and np.absolute(f2[macth_point][0] - f1[j][0]) < 20):
+				and np.absolute(f2[macth_point][0] - f1[j][0]) < 20)
+			if(is_match):
 				matching_pairs.append(np.array([f1[j], f2[macth_point]]))
-				difs.append(dif[macth_point])
 		matching_pairs = np.asarray(matching_pairs)
 		all_matching_pairs.append(matching_pairs)
 		print('pic{}, match pairs:{}'.format(i, matching_pairs.shape[0]))
-		all_difs.append(np.array(difs))
-	return np.asarray(all_matching_pairs), np.asarray(all_difs)
+	return np.asarray(all_matching_pairs)
 
 def blending(img1, img2, w):
 	output = np.zeros((img1.shape[0], img1.shape[1] + img2.shape[1] - w, 3), dtype = int)
@@ -240,54 +242,30 @@ def multi_band_blending(img1, img2, overlap_w):
 	cv2.imwrite("output.png", result.astype(int))
 	return result.astype(int)
 
-def ImageMatching(images, matching_pairs, difs):
-	#padding_images = np.array([cv2.copyMakeBorder(images[i], 50, 50, 0, 0, cv2.BORDER_CONSTANT, value=0) for i in range(images.shape[0])])
+def ImageMatching(images, matching_pairs):
+	padding_images = np.array([cv2.copyMakeBorder(images[i], 50, 50, 0, 0, cv2.BORDER_CONSTANT, value=0) for i in range(images.shape[0])])
 	match_image = padding_images[0]
-	# f = open('match.txt', 'w')
 	for i in range(len(images)):
 		x_allshift = matching_pairs[i][:, 0, 1] - matching_pairs[i][:, 1, 1] + images[i].shape[1]
 		y_allshift = matching_pairs[i][:, 0, 0] - matching_pairs[i][:, 1, 0]
-		dif = difs[i]
 		similar_max = 0
 		x_shift = 0
 		y_shift = 0
 		for shift_idx in range(len(x_allshift)):
-			similar_shift = np.sum(abs(x_allshift - x_allshift[shift_idx] + y_allshift - y_allshift[shift_idx]) < 10)
+			similar_shift = np.sum(abs(x_allshift - x_allshift[shift_idx]) < 10)
 			if similar_shift > similar_max:
 				similar_max = similar_shift
 				x_shift = x_allshift[shift_idx]
 				y_shift = y_allshift[shift_idx]
-		"""		allshift = matching_pairs[i][:, 0, :] - matching_pairs[i][:, 1, :] + [0, images[0].shape[1]]
-		similar_max = [0, 0]
-		shifts = [0, 0]
-		for shift in allshift:
-			similar_x_shift = np.sum(abs(allshift[1] - shift[1]) < 5)
-			if similar_x_shift > similar_max[1]:
-				similar_max[1] = similar_x_shift
-				shifts[1] = shift[1]
-			similar_y_shift = np.sum(abs(allshift[0] - shift[0]) < 2)
-			if similar_y_shift > similar_max[0]:
-				similar_max[0] = similar_y_shift
-				shifts[0] = shift[0]
-		print(shifts)"""
-		"""w = 1- (abs(dif-np.median(dif)))/max(np.max(dif)-np.median(dif), abs(np.min(dif)-np.median(dif)))
-		print(x_allshift)
-		print(w)
-		x_shift = int(np.average(x_allshift, weights=w))"""
-
-		# x_shift = int(images[0].shape[1] + np.mean(matching_pairs[i][:, 0, 1]) - np.mean(matching_pairs[i][:, 1,1]))
 
 		nextimage = padding_images[i+1] if i+1 != len(padding_images) else padding_images[0]
 		
-		"""M = np.float32([[1, 0, 0],[0, 1, -y_shift]])
-		match_image=np.asarray(match_image, dtype=np.float32)
-		match_image = cv2.warpAffine(match_image, M, (match_image.shape[1], match_image.shape[0]))"""
+		# M = np.float32([[1, 0, 0],[0, 1, -y_shift]])
+		# match_image=np.asarray(match_image, dtype=np.float32)
+		# match_image = cv2.warpAffine(match_image, M, (match_image.shape[1], match_image.shape[0]))
 
-		# match_image = np.concatenate((nextimage[:, :-x_shift//2], match_image[:, x_shift//2:]), 1)
 		match_image = multi_band_blending(nextimage, match_image, x_shift)
-		# f.write(str(i) + ',' + str(x_shift//2) + '\n')
 		# cv2.imwrite('{}/matchimg{}.jpg'.format('../output', i), np.concatenate((nextimage[:, :-x_shift//2], images[i][:, x_shift//2:]), 1))
-	# f.close()
 
 
 	return match_image
@@ -295,9 +273,9 @@ def ImageMatching(images, matching_pairs, difs):
 def main():
 	parser = argparse.ArgumentParser(description="Use Multi-Scale Oriented Patches to find features of images.")
 	parser.add_argument("-p", "--path", help="input path name of images")
-	parser.add_argument("-o", "--output", help="ouput path name of images", default='./output')
+	parser.add_argument("-o", "--output", help="ouput path name of images", default='../output')
 	# parser.add_argument("-f", "--featurenum", help="number of features", default=250)
-	parser.add_argument("-w", "--windowsize", help="window size", default=9)
+	parser.add_argument("-w", "--windowsize", help="window size", default=5)  
 	parser.add_argument("-d", "--descriptorwindow", help="descriptor window size", default=5)	
 	args = parser.parse_args()
 	
@@ -316,11 +294,9 @@ def main():
 			cv2.circle(image, (feature[1], feature[0]), 1, (0, 0, 255), -1)
 		cv2.imwrite('{}/img{}.jpg'.format(args.output, i), image)
 
-	"""matching_pairs, difs = FeatureMatching(images, features, descriptors)
+	matching_pairs = FeatureMatching(images, features, descriptors)
 	np.save('matching_pairs', matching_pairs)
-	np.save('difs', difs)"""
-	matching_pairs = np.load('matching_pairs.npy')
-	difs = np.load('difs.npy')
+	# matching_pairs = np.load('matching_pairs.npy')
 	
 	for i in range(len(images)):
 		img1 = np.copy(images[i])
@@ -334,7 +310,7 @@ def main():
 			cv2.line(pic, m1, m2, (255, 255, 0), 1)
 		cv2.imwrite('{}/matchingimg{}.jpg'.format(args.output, i), pic)
 
-	match_image = ImageMatching(images, matching_pairs, difs)
+	match_image = ImageMatching(images, matching_pairs)
 	cv2.imwrite('{}/matchimg.jpg'.format(args.output), match_image)
 
 
