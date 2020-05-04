@@ -127,7 +127,7 @@ def MultiScaleHarrisCornerDetector(images, windowsize, descriptorwindow, level=5
 
 	return np.asarray(all_features), np.asarray(all_descriptors)
 
-def FeatureMatching(images, features, descriptors, match_distance=20):
+def FeatureMatching(images, features, descriptors, descriptor_size, match_distance=50):
 	all_matching_pairs = []
 	all_difs = []
 	for i in range(len(images)):
@@ -141,7 +141,7 @@ def FeatureMatching(images, features, descriptors, match_distance=20):
 			if(f1[j][1] > images[0].shape[1]/2):
 				continue
 
-			d1_ = np.concatenate([d1[j] for n in range(d2.shape[0])]).reshape((d2.shape[0], 25, 3))
+			d1_ = np.concatenate([d1[j] for n in range(d2.shape[0])]).reshape((d2.shape[0], descriptor_size**2, 3))
 			dif = np.sum(np.sum(np.absolute(d1_ - d2), axis=1), axis=1)
 			dif = np.array(dif, dtype=np.float32)
 			macth_point = np.argsort(dif)[0]
@@ -241,22 +241,24 @@ def multi_band_blending(img1, img2, overlap_w):
 	return result.astype(int)
 
 def ImageMatching(images, matching_pairs, difs):
-	#padding_images = np.array([cv2.copyMakeBorder(images[i], 50, 50, 0, 0, cv2.BORDER_CONSTANT, value=0) for i in range(images.shape[0])])
+	padding_images = np.array([cv2.copyMakeBorder(images[i], 50, 50, 0, 0, cv2.BORDER_CONSTANT, value=0) for i in range(images.shape[0])])
 	match_image = padding_images[0]
 	# f = open('match.txt', 'w')
 	for i in range(len(images)):
-		x_allshift = matching_pairs[i][:, 0, 1] - matching_pairs[i][:, 1, 1] + images[i].shape[1]
-		y_allshift = matching_pairs[i][:, 0, 0] - matching_pairs[i][:, 1, 0]
-		dif = difs[i]
-		similar_max = 0
-		x_shift = 0
+		x_shift = 100
 		y_shift = 0
-		for shift_idx in range(len(x_allshift)):
-			similar_shift = np.sum(abs(x_allshift - x_allshift[shift_idx] + y_allshift - y_allshift[shift_idx]) < 10)
-			if similar_shift > similar_max:
-				similar_max = similar_shift
-				x_shift = x_allshift[shift_idx]
-				y_shift = y_allshift[shift_idx]
+		if matching_pairs[i].shape[0] != 0:
+			print(matching_pairs[i][:, 0, 1].shape, matching_pairs[i][:, 1, 1].shape, images[i].shape[1])
+			x_allshift = matching_pairs[i][:, 0, 1] - matching_pairs[i][:, 1, 1] + images[i].shape[1]
+			y_allshift = matching_pairs[i][:, 0, 0] - matching_pairs[i][:, 1, 0]
+			dif = difs[i]
+			similar_max = 0
+			for shift_idx in range(len(x_allshift)):
+				similar_shift = np.sum(abs(x_allshift - x_allshift[shift_idx] + y_allshift - y_allshift[shift_idx]) < 10)
+				if similar_shift > similar_max:
+					similar_max = similar_shift
+					x_shift = x_allshift[shift_idx]
+					y_shift = y_allshift[shift_idx]
 		"""		allshift = matching_pairs[i][:, 0, :] - matching_pairs[i][:, 1, :] + [0, images[0].shape[1]]
 		similar_max = [0, 0]
 		shifts = [0, 0]
@@ -279,11 +281,11 @@ def ImageMatching(images, matching_pairs, difs):
 
 		nextimage = padding_images[i+1] if i+1 != len(padding_images) else padding_images[0]
 		
-		"""M = np.float32([[1, 0, 0],[0, 1, -y_shift]])
+		M = np.float32([[1, 0, 0],[0, 1, -y_shift]])
 		match_image=np.asarray(match_image, dtype=np.float32)
-		match_image = cv2.warpAffine(match_image, M, (match_image.shape[1], match_image.shape[0]))"""
+		match_image = cv2.warpAffine(match_image, M, (match_image.shape[1], match_image.shape[0]))
 
-		# match_image = np.concatenate((nextimage[:, :-x_shift//2], match_image[:, x_shift//2:]), 1)
+		match_image = np.concatenate((nextimage[:, :-x_shift//2], match_image[:, x_shift//2:]), 1)
 		match_image = multi_band_blending(nextimage, match_image, x_shift)
 		# f.write(str(i) + ',' + str(x_shift//2) + '\n')
 		# cv2.imwrite('{}/matchimg{}.jpg'.format('../output', i), np.concatenate((nextimage[:, :-x_shift//2], images[i][:, x_shift//2:]), 1))
@@ -297,17 +299,17 @@ def main():
 	parser.add_argument("-p", "--path", help="input path name of images")
 	parser.add_argument("-o", "--output", help="ouput path name of images", default='./output')
 	# parser.add_argument("-f", "--featurenum", help="number of features", default=250)
-	parser.add_argument("-w", "--windowsize", help="window size", default=9)
-	parser.add_argument("-d", "--descriptorwindow", help="descriptor window size", default=5)	
+	parser.add_argument("-w", "--windowsize", help="window size", type = int , default=9)
+	parser.add_argument("-d", "--descriptorwindow", help="descriptor window size", type = int ,default=5)	
 	args = parser.parse_args()
 	
 	images = ReadImages(args.path)
 
-	features, descriptors = MultiScaleHarrisCornerDetector(images, args.windowsize, args.descriptorwindow)
+	"""features, descriptors = MultiScaleHarrisCornerDetector(images, args.windowsize, args.descriptorwindow)
 	np.save('features', features)
-	np.save('descriptors', descriptors)
-	# features = np.load('features.npy')
-	# descriptors = np.load('descriptors.npy')
+	np.save('descriptors', descriptors)"""
+	features = np.load('features.npy')
+	descriptors = np.load('descriptors.npy')
 
 
 	for i, img in enumerate(images):
@@ -316,7 +318,7 @@ def main():
 			cv2.circle(image, (feature[1], feature[0]), 1, (0, 0, 255), -1)
 		cv2.imwrite('{}/img{}.jpg'.format(args.output, i), image)
 
-	"""matching_pairs, difs = FeatureMatching(images, features, descriptors)
+	"""matching_pairs, difs = FeatureMatching(images, features, descriptors, args.descriptorwindow)
 	np.save('matching_pairs', matching_pairs)
 	np.save('difs', difs)"""
 	matching_pairs = np.load('matching_pairs.npy')
