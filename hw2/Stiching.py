@@ -15,26 +15,28 @@ def read_img(filename):
 		if "#file " in lines[i]:
 			imgs.append(cv2.imread(lines[i].split()[-1]))
 		if "#f " in lines[i]:
-			f.append(float(lines[i].split()[-1]))
+			#f.append(float(lines[i].split()[-1]))
+			f.append(3700)
 	return imgs, f
 
 def DownSampling(Images, ScalePercent=10):
 	"""
 	Resize the Images
 	"""
-	width = int(Images[0].shape[1] * ScalePercent / 100)
-	height = int(Images[0].shape[0] * ScalePercent / 100)
-	dim = (width, height)
 	ResizeImages = []
 	for i in range(len(Images)):
+		width = int(Images[i].shape[1] * ScalePercent / 100)
+		height = int(Images[i].shape[0] * ScalePercent / 100)
+		dim = (width, height)
 		ResizeImages.append(cv2.resize(Images[i], dim, interpolation = cv2.INTER_AREA))
 	return ResizeImages
 
 def warping_imgs(imgs, fs):
 	warp_img = list()
 	for i in range(len(imgs)):
-		warp_img.append(warping(imgs[i], fs[i]))
-	return warp_img
+		warp_img.append(warping(imgs[i], 300))
+		#cv2.imwrite("./warped_images2/warped" + str(i) + ".png", warp_img[i])
+	return np.array(warp_img)
 
 def warping(img, f):
 	output = np.zeros(img.shape, dtype=np.float32)
@@ -154,6 +156,7 @@ def main():
 	imgs = DownSampling(imgs, 10)
 	#warping(imgs[0], fs[0])
 	multi_band_blending(imgs[7], imgs[6], 120)
+
 	for i in range(len(imgs)):
 		cv2.imwrite("warping2/wraping{}.jpg".format(i), imgs[i])
 if __name__ == '__main__':
