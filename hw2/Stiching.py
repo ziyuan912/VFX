@@ -3,7 +3,7 @@ import cv2
 import argparse
 from scipy.ndimage import filters
 import os
-from tqdm import tqdm_notebook as tqdm
+from tqdm import tqdm as tqdm
 
 def read_img(filename):
 	imgs = list()
@@ -15,33 +15,35 @@ def read_img(filename):
 		if "#file " in lines[i]:
 			imgs.append(cv2.imread(lines[i].split()[-1]))
 		if "#f " in lines[i]:
-			f.append(float(lines[i].split()[-1]))
+			#f.append(float(lines[i].split()[-1]))
+			f.append(3700)
 	return imgs, f
 
 def DownSampling(Images, ScalePercent=10):
 	"""
 	Resize the Images
 	"""
-	width = int(Images[0].shape[1] * ScalePercent / 100)
-	height = int(Images[0].shape[0] * ScalePercent / 100)
-	dim = (width, height)
 	ResizeImages = []
 	for i in range(len(Images)):
+		width = int(Images[i].shape[1] * ScalePercent / 100)
+		height = int(Images[i].shape[0] * ScalePercent / 100)
+		dim = (width, height)
 		ResizeImages.append(cv2.resize(Images[i], dim, interpolation = cv2.INTER_AREA))
 	return ResizeImages
 
 def warping_imgs(imgs, fs):
 	warp_img = list()
 	for i in range(len(imgs)):
-		warp_img.append(warping(imgs[i], fs[i]))
-	return warp_img
+		warp_img.append(warping(imgs[i], 300))
+		#cv2.imwrite("./warped_images2/warped" + str(i) + ".png", warp_img[i])
+	return np.array(warp_img)
 
 def warping(img, f):
-	output = np.zeros(img.shape, dtype=int)
+	output = np.zeros(img.shape, dtype=np.float32)
 	y0 = img.shape[0] // 2
 	x0 = img.shape[1] // 2
 	leftmost, rightmost, upmost, downmost = (img.shape[1] - 1, 0, img.shape[0] - 1, 0)
-	for x in range(img.shape[1]):
+	for x in tqdm(range(img.shape[1])):
 		for y in range(img.shape[0]):
 			x2 = f * np.tan((x - x0) / f)
 			y2 = (y - y0)*np.sqrt(x2*x2 + f*f) / f
@@ -151,9 +153,10 @@ def main():
 
 	imgs, fs = read_img(args.file)
 	imgs = DownSampling(imgs, 10)
-	#warping(imgs[0], fs[0])
 	imgs = warping_imgs(imgs, fs)
-	multi_band_blending(imgs[7], imgs[6], 120)
+	np.save('warping_imgs_library', imgs)
+	#warping(imgs[0], fs[0])
+	#multi_band_blending(imgs[7], imgs[6], 120)
 	for i in range(len(imgs)):
 		cv2.imwrite("warping/wraping{}.jpg".format(i), imgs[i])
 if __name__ == '__main__':
