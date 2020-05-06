@@ -3,7 +3,7 @@ import cv2
 import argparse
 from scipy.ndimage import filters
 import os
-from tqdm import tqdm_notebook as tqdm
+from tqdm import tqdm as tqdm
 
 def read_img(filename):
 	imgs = list()
@@ -37,11 +37,11 @@ def warping_imgs(imgs, fs):
 	return warp_img
 
 def warping(img, f):
-	output = np.zeros(img.shape, dtype=int)
+	output = np.zeros(img.shape, dtype=np.float32)
 	y0 = img.shape[0] // 2
 	x0 = img.shape[1] // 2
 	leftmost, rightmost, upmost, downmost = (img.shape[1] - 1, 0, img.shape[0] - 1, 0)
-	for x in range(img.shape[1]):
+	for x in tqdm(range(img.shape[1])):
 		for y in range(img.shape[0]):
 			x2 = f * np.tan((x - x0) / f)
 			y2 = (y - y0)*np.sqrt(x2*x2 + f*f) / f
@@ -150,11 +150,11 @@ def main():
 	args = parser.parse_args()
 
 	imgs, fs = read_img(args.file)
+	imgs = warping_imgs(imgs, fs)
 	imgs = DownSampling(imgs, 10)
 	#warping(imgs[0], fs[0])
-	imgs = warping_imgs(imgs, fs)
 	multi_band_blending(imgs[7], imgs[6], 120)
 	for i in range(len(imgs)):
-		cv2.imwrite("warping/wraping{}.jpg".format(i), imgs[i])
+		cv2.imwrite("warping2/wraping{}.jpg".format(i), imgs[i])
 if __name__ == '__main__':
 	main()
